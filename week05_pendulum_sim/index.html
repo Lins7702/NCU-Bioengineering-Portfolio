@@ -3,52 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>单摆模拟器 · Week 05</title>
+<title>双摆混沌模拟器 · Week 05</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a24; display: flex; flex-direction: column; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d18; display: flex; flex-direction: column; }
   canvas { display: block; cursor: grab; }
   canvas:active { cursor: grabbing; }
   #controls {
     height: 108px; flex-shrink: 0;
-    background: linear-gradient(180deg, #1e1e2a, #1a1a24);
-    border-top: 1px solid rgba(80,130,200,0.12);
+    background: linear-gradient(180deg, #141422, #0d0d18);
+    border-top: 1px solid rgba(120,80,200,0.12);
     display: flex; align-items: center; justify-content: center;
-    gap: 32px; padding: 10px 24px;
+    gap: 28px; padding: 10px 24px;
     font-family: 'Cascadia Code','Consolas','Courier New',monospace;
   }
   .ctrl { display: flex; flex-direction: column; align-items: center; gap: 5px; }
   .ctrl label {
-    font-size: 11px; color: rgba(140,170,210,0.6);
+    font-size: 11px; color: rgba(160,140,210,0.6);
     letter-spacing: 0.5px; user-select: none; white-space: nowrap;
   }
   .ctrl input[type=range] {
     -webkit-appearance: none; appearance: none;
-    width: 150px; height: 4px;
-    background: rgba(60,80,120,0.35); border-radius: 2px; outline: none;
+    width: 130px; height: 4px;
+    background: rgba(80,60,140,0.3); border-radius: 2px; outline: none;
   }
   .ctrl input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px;
-    border-radius: 50%; background: #4a9ae0; cursor: pointer;
-    box-shadow: 0 0 8px rgba(74,154,224,0.5);
+    border-radius: 50%; background: #9a6ef0; cursor: pointer;
+    box-shadow: 0 0 8px rgba(154,110,240,0.5);
   }
   .ctrl input[type=range]::-moz-range-thumb {
     width: 14px; height: 14px; border: none;
-    border-radius: 50%; background: #4a9ae0; cursor: pointer;
-    box-shadow: 0 0 8px rgba(74,154,224,0.5);
+    border-radius: 50%; background: #9a6ef0; cursor: pointer;
+    box-shadow: 0 0 8px rgba(154,110,240,0.5);
   }
   .ctrl .val {
-    font-size: 12px; color: rgba(100,190,255,0.8); min-width: 50px; text-align: center;
+    font-size: 12px; color: rgba(180,150,255,0.8); min-width: 50px; text-align: center;
   }
   #resetBtn {
-    padding: 8px 22px; border: 1px solid rgba(80,150,220,0.25);
-    border-radius: 6px; background: rgba(40,50,80,0.45);
-    color: rgba(160,195,235,0.8); font: 13px/1 system-ui,sans-serif;
+    padding: 8px 22px; border: 1px solid rgba(140,100,220,0.25);
+    border-radius: 6px; background: rgba(50,35,80,0.45);
+    color: rgba(190,170,235,0.8); font: 13px/1 system-ui,sans-serif;
     cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
   }
   #resetBtn:hover {
-    background: rgba(50,70,110,0.6); border-color: rgba(80,150,220,0.45);
-    box-shadow: 0 0 14px rgba(80,150,220,0.18);
+    background: rgba(60,45,110,0.6); border-color: rgba(140,100,220,0.45);
+    box-shadow: 0 0 14px rgba(140,100,220,0.18);
   }
   #resetBtn:active { transform: scale(0.96); }
 </style>
@@ -57,9 +57,19 @@
 <canvas id="sim"></canvas>
 <div id="controls">
   <div class="ctrl">
-    <label>摆长 L</label>
-    <input type="range" id="sldL" min="100" max="350" value="200" step="1">
-    <span class="val" id="valL">200 px</span>
+    <label>摆长 L₁</label>
+    <input type="range" id="sldL1" min="60" max="250" value="150" step="1">
+    <span class="val" id="valL1">150 px</span>
+  </div>
+  <div class="ctrl">
+    <label>摆长 L₂</label>
+    <input type="range" id="sldL2" min="60" max="250" value="150" step="1">
+    <span class="val" id="valL2">150 px</span>
+  </div>
+  <div class="ctrl">
+    <label>质量 m₂</label>
+    <input type="range" id="sldM2" min="0.5" max="5" value="1.5" step="0.1">
+    <span class="val" id="valM2">1.5</span>
   </div>
   <div class="ctrl">
     <label>重力 g</label>
@@ -67,9 +77,9 @@
     <span class="val" id="valG">9.8</span>
   </div>
   <div class="ctrl">
-    <label>阻尼</label>
-    <input type="range" id="sldD" min="0" max="0.010" value="0.001" step="0.001">
-    <span class="val" id="valD">0.001</span>
+    <label>拖尾长度</label>
+    <input type="range" id="sldTrail" min="100" max="1500" value="600" step="50">
+    <span class="val" id="valTrail">600</span>
   </div>
   <button id="resetBtn">重置摆动</button>
 </div>
@@ -81,7 +91,7 @@
   const canvas = document.getElementById('sim');
   const ctx = canvas.getContext('2d');
   let W, H, dpr;
-  const PANEL_H = 108;    // 控制面板高度 (px)
+  const PANEL_H = 108;
 
   function resize() {
     dpr = window.devicePixelRatio || 1;
@@ -97,48 +107,120 @@
   window.addEventListener('resize', resize);
 
   /* ====== 物理参数 ====== */
-  let L     = 200;          // 摆长 (px)
-  let G     = 9.8;          // 重力加速度
-  const SCALE = 50;           // 像素/米 缩放因子
-  let DAMP  = 0.999;        // 阻尼系数 (由滑块控制)
-  const DT    = 1 / 120;      // 固定物理步长 (s)
+  let L1 = 150, L2 = 150;       // 两段摆长 (px)
+  let m1 = 1.5, m2 = 1.5;       // 两个摆球质量
+  let G  = 9.8;                   // 重力加速度
+  const SCALE = 40;               // 像素/米 缩放因子
+  const DT = 1 / 240;            // 固定物理步长 (s) — 高频率保证稳定性
+  let trailMax = 600;             // 拖尾最大点数
 
-  /* ====== 状态变量 ====== */
-  let theta     = Math.PI / 4;   // 当前摆角 (rad)，正=右偏
-  let omega     = 0;             // 角速度 (rad/s)
-  let simTime   = 0;
+  /* ====== 状态变量 [θ₁, ω₁, θ₂, ω₂] ====== */
+  let state = [Math.PI * 0.6, 0, Math.PI * 0.8, 0];
+  let simTime = 0;
   let lastStamp = null;
-  let accum     = 0;             // 时间累加器
+  let accum = 0;
 
   /* ====== 拖拽交互 ====== */
-  let dragging = false;
+  let dragging = 0;  // 0=无, 1=拖拽球1, 2=拖拽球2
 
-  /* ====== 运动轨迹 ====== */
-  const trail = [];
-  const TRAIL_MAX = 80;
+  /* ====== 拖尾缓冲 ====== */
+  const trail = [];  // { x, y, hue }
 
   /* ====== 坐标工具 ====== */
   function pivot() {
-    return { x: W / 2, y: Math.min(H * 0.22, 180) };
-  }
-  function bobXY(th) {
-    const p = pivot();
-    return { x: p.x + L * Math.sin(th), y: p.y + L * Math.cos(th) };
+    return { x: W / 2, y: Math.min(H * 0.25, 200) };
   }
 
-  /* ====== 物理步进 (Velocity-Verlet) ====== */
+  function bob1XY() {
+    const p = pivot();
+    return {
+      x: p.x + L1 * Math.sin(state[0]),
+      y: p.y + L1 * Math.cos(state[0])
+    };
+  }
+
+  function bob2XY() {
+    const b1 = bob1XY();
+    return {
+      x: b1.x + L2 * Math.sin(state[2]),
+      y: b1.y + L2 * Math.cos(state[2])
+    };
+  }
+
+  /* ====== 双摆微分方程 (Lagrangian 力学) ====== */
+  function derivs(s) {
+    const th1 = s[0], w1 = s[1], th2 = s[2], w2 = s[3];
+    const l1 = L1 / SCALE, l2 = L2 / SCALE;
+    const dth = th1 - th2;
+    const sinD = Math.sin(dth), cosD = Math.cos(dth);
+    const M = m1 + m2;
+
+    // 分母
+    const den = 2 * m1 + m2 - m2 * Math.cos(2 * dth);
+
+    // θ₁'' 加速度
+    const a1_num = -G * (2 * m1 + m2) * Math.sin(th1)
+                 - m2 * G * Math.sin(th1 - 2 * th2)
+                 - 2 * sinD * m2 * (w2 * w2 * l2 + w1 * w1 * l1 * cosD);
+    const a1 = a1_num / (l1 * den);
+
+    // θ₂'' 加速度
+    const a2_num = 2 * sinD * (
+        w1 * w1 * l1 * M
+      + G * M * Math.cos(th1)
+      + w2 * w2 * l2 * m2 * cosD
+    );
+    const a2 = a2_num / (l2 * den);
+
+    return [w1, a1, w2, a2];
+  }
+
+  /* ====== Runge-Kutta 4 阶积分器 ====== */
+  function rk4Step(s, dt) {
+    const k1 = derivs(s);
+    const s2 = [
+      s[0] + k1[0] * dt * 0.5,
+      s[1] + k1[1] * dt * 0.5,
+      s[2] + k1[2] * dt * 0.5,
+      s[3] + k1[3] * dt * 0.5
+    ];
+    const k2 = derivs(s2);
+    const s3 = [
+      s[0] + k2[0] * dt * 0.5,
+      s[1] + k2[1] * dt * 0.5,
+      s[2] + k2[2] * dt * 0.5,
+      s[3] + k2[3] * dt * 0.5
+    ];
+    const k3 = derivs(s3);
+    const s4 = [
+      s[0] + k3[0] * dt,
+      s[1] + k3[1] * dt,
+      s[2] + k3[2] * dt,
+      s[3] + k3[3] * dt
+    ];
+    const k4 = derivs(s4);
+
+    return [
+      s[0] + (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) * dt / 6,
+      s[1] + (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) * dt / 6,
+      s[2] + (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]) * dt / 6,
+      s[3] + (k1[3] + 2*k2[3] + 2*k3[3] + k4[3]) * dt / 6
+    ];
+  }
+
+  /* ====== 物理步进 ====== */
   function step(dt) {
-    const gEff = G * SCALE / L;
-    const a0 = -gEff * Math.sin(theta);
-    theta += omega * dt + 0.5 * a0 * dt * dt;
-    const a1 = -gEff * Math.sin(theta);
-    omega = (omega + 0.5 * (a0 + a1) * dt) * DAMP;
+    state = rk4Step(state, dt);
+    // 安全钳制：防止数值爆炸
+    for (let i = 1; i <= 3; i += 2) {
+      if (Math.abs(state[i]) > 100) state[i] = Math.sign(state[i]) * 100;
+    }
     simTime += dt;
   }
 
   /* ====== 绘制：背景网格 ====== */
   function drawGrid() {
-    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.018)';
     ctx.lineWidth = 0.5;
     const gap = 50;
     for (let x = gap; x < W; x += gap) {
@@ -149,16 +231,29 @@
     }
   }
 
-  /* ====== 绘制：运动轨迹 ====== */
+  /* ====== 绘制：彩虹渐变拖尾 ====== */
   function drawTrail() {
-    if (trail.length < 2) return;
-    for (let i = 1; i < trail.length; i++) {
-      const t = i / trail.length;
+    const len = trail.length;
+    if (len < 2) return;
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = 1; i < len; i++) {
+      const t = i / len;  // 0→1 (旧→新)
+      const p0 = trail[i - 1];
+      const p1 = trail[i];
+
+      // 色相随时间循环，透明度随年龄衰减
+      const hue = (p1.hue) % 360;
+      const alpha = t * t * 0.7;  // 二次衰减曲线，尾部更柔和
+      const width = 1.0 + t * 3.0;
+
       ctx.beginPath();
-      ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
-      ctx.lineTo(trail[i].x, trail[i].y);
-      ctx.strokeStyle = 'rgba(80,180,255,' + (t * 0.35).toFixed(3) + ')';
-      ctx.lineWidth = t * 2.5;
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.strokeStyle = 'hsla(' + hue + ',85%,60%,' + alpha.toFixed(3) + ')';
+      ctx.lineWidth = width;
       ctx.stroke();
     }
   }
@@ -166,7 +261,7 @@
   /* ====== 绘制：支架 ====== */
   function drawBracket() {
     const p = pivot();
-    ctx.fillStyle = '#3a3a50';
+    ctx.fillStyle = '#2e2e42';
     const bw = 80, bh = 8, r = 4;
     ctx.beginPath();
     ctx.moveTo(p.x - bw / 2 + r, p.y - bh / 2);
@@ -178,15 +273,28 @@
   }
 
   /* ====== 绘制：摆杆 ====== */
-  function drawRod() {
-    const p = pivot(), b = bobXY(theta);
-    const grad = ctx.createLinearGradient(p.x, p.y, b.x, b.y);
-    grad.addColorStop(0, 'rgba(180,180,200,0.7)');
-    grad.addColorStop(1, 'rgba(140,140,160,0.4)');
+  function drawRods() {
+    const p = pivot(), b1 = bob1XY(), b2 = bob2XY();
+
+    // 杆1
+    const g1 = ctx.createLinearGradient(p.x, p.y, b1.x, b1.y);
+    g1.addColorStop(0, 'rgba(160,140,200,0.6)');
+    g1.addColorStop(1, 'rgba(130,110,170,0.35)');
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = grad;
+    ctx.lineTo(b1.x, b1.y);
+    ctx.strokeStyle = g1;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 杆2
+    const g2 = ctx.createLinearGradient(b1.x, b1.y, b2.x, b2.y);
+    g2.addColorStop(0, 'rgba(140,120,180,0.5)');
+    g2.addColorStop(1, 'rgba(120,100,160,0.3)');
+    ctx.beginPath();
+    ctx.moveTo(b1.x, b1.y);
+    ctx.lineTo(b2.x, b2.y);
+    ctx.strokeStyle = g2;
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -196,56 +304,66 @@
     const p = pivot();
     ctx.beginPath();
     ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#6a6a80';
+    ctx.fillStyle = '#5a5a75';
     ctx.fill();
     ctx.beginPath();
     ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#9a9ab0';
+    ctx.fillStyle = '#8a8aa5';
     ctx.fill();
   }
 
-  /* ====== 绘制：摆球（多层发光） ====== */
-  function drawBob() {
-    const b = bobXY(theta);
-    const R = 18;
-
+  /* ====== 绘制：摆球 (多层发光) ====== */
+  function drawBob(x, y, radius, color, glowColor) {
     // 外层光晕
     ctx.save();
-    ctx.shadowColor = 'rgba(60,160,255,0.55)';
-    ctx.shadowBlur = 45;
-    const g1 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R * 3);
-    g1.addColorStop(0, 'rgba(70,170,255,0.18)');
-    g1.addColorStop(0.5, 'rgba(50,130,255,0.05)');
-    g1.addColorStop(1, 'rgba(40,100,255,0)');
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 40;
+    const g1 = ctx.createRadialGradient(x, y, 0, x, y, radius * 3);
+    g1.addColorStop(0, glowColor.replace('0.5', '0.15'));
+    g1.addColorStop(0.5, glowColor.replace('0.5', '0.04'));
+    g1.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.beginPath();
-    ctx.arc(b.x, b.y, R * 3, 0, Math.PI * 2);
+    ctx.arc(x, y, radius * 3, 0, Math.PI * 2);
     ctx.fillStyle = g1;
     ctx.fill();
     ctx.restore();
 
     // 球体
     ctx.save();
-    ctx.shadowColor = 'rgba(80,180,255,0.85)';
-    ctx.shadowBlur = 22;
-    const g2 = ctx.createRadialGradient(b.x - 5, b.y - 5, 2, b.x, b.y, R);
-    g2.addColorStop(0, '#dceeff');
-    g2.addColorStop(0.35, '#5ca8f0');
-    g2.addColorStop(0.75, '#3578c4');
-    g2.addColorStop(1, '#1e4d8c');
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 20;
+    const g2 = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 1, x, y, radius);
+    g2.addColorStop(0, color[0]);
+    g2.addColorStop(0.4, color[1]);
+    g2.addColorStop(0.8, color[2]);
+    g2.addColorStop(1, color[3]);
     ctx.beginPath();
-    ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fillStyle = g2;
     ctx.fill();
     ctx.restore();
 
     // 高光
-    const g3 = ctx.createRadialGradient(b.x - 6, b.y - 6, 0, b.x - 4, b.y - 4, 9);
-    g3.addColorStop(0, 'rgba(255,255,255,0.55)');
+    const g3 = ctx.createRadialGradient(
+      x - radius * 0.35, y - radius * 0.35, 0,
+      x - radius * 0.25, y - radius * 0.25, radius * 0.55
+    );
+    g3.addColorStop(0, 'rgba(255,255,255,0.5)');
     g3.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.beginPath();
-    ctx.arc(b.x - 5, b.y - 5, 9, 0, Math.PI * 2);
+    ctx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.55, 0, Math.PI * 2);
     ctx.fillStyle = g3;
     ctx.fill();
+  }
+
+  function drawBobs() {
+    const b1 = bob1XY(), b2 = bob2XY();
+    drawBob(b1.x, b1.y, 15,
+      ['#e8d0ff', '#b080e8', '#7a50c0', '#4a2888'],
+      'rgba(160,100,240,0.5)');
+    drawBob(b2.x, b2.y, 13,
+      ['#d0f0ff', '#60c8f0', '#3090d0', '#1860a0'],
+      'rgba(60,160,240,0.5)');
   }
 
   /* ====== 绘制：角度参考线 ====== */
@@ -255,8 +373,8 @@
     ctx.setLineDash([4, 6]);
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x, p.y + L);
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineTo(p.x, p.y + L1 + L2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
@@ -264,23 +382,43 @@
 
   /* ====== 绘制：HUD 信息面板 ====== */
   function drawHUD() {
-    const deg = (theta * 180 / Math.PI).toFixed(1);
-    const vel = omega.toFixed(3);
+    const deg1 = (state[0] * 180 / Math.PI).toFixed(1);
+    const deg2 = (state[2] * 180 / Math.PI).toFixed(1);
+    const w1 = state[1].toFixed(2);
+    const w2 = state[3].toFixed(2);
     const sec = simTime.toFixed(1);
 
+    // 计算总能量 (用于监控守恒)
+    const l1 = L1 / SCALE, l2 = L2 / SCALE;
+    const th1 = state[0], w1_ = state[1], th2 = state[2], w2_ = state[3];
+    const y1 = -l1 * Math.cos(th1);
+    const y2 = y1 - l2 * Math.cos(th2);
+    const v1x = l1 * w1_ * Math.cos(th1);
+    const v1y = -l1 * w1_ * Math.sin(th1);
+    const v2x = v1x + l2 * w2_ * Math.cos(th2);
+    const v2y = v1y - l2 * w2_ * Math.sin(th2);
+    const KE = 0.5 * m1 * (v1x*v1x + v1y*v1y) + 0.5 * m2 * (v2x*v2x + v2y*v2y);
+    const PE = m1 * G * y1 + m2 * G * y2;
+    const E = (KE + PE).toFixed(2);
+
     ctx.save();
-    ctx.font = '13px "Cascadia Code","Consolas","Courier New",monospace';
+    ctx.font = '12px "Cascadia Code","Consolas","Courier New",monospace';
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(130,175,220,0.6)';
-    const x = 24, y0 = H - 80;
-    ctx.fillText('\u2220  \u03B8 = ' + deg + '\u00B0', x, y0);
-    ctx.fillText('\u03C9 = ' + vel + ' rad/s', x, y0 + 22);
-    ctx.fillText('t = ' + sec + ' s', x, y0 + 44);
+    ctx.fillStyle = 'rgba(160,140,210,0.55)';
+    const x = 24, y0 = H - 102;
+    ctx.fillText('\u2220 \u03B8\u2081 = ' + deg1 + '\u00B0', x, y0);
+    ctx.fillText('\u2220 \u03B8\u2082 = ' + deg2 + '\u00B0', x, y0 + 20);
+    ctx.fillText('\u03C9\u2081 = ' + w1 + '  \u03C9\u2082 = ' + w2, x, y0 + 40);
+    ctx.fillText('E = ' + E + ' J', x, y0 + 60);
+    ctx.fillText('t = ' + sec + ' s', x, y0 + 80);
+
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(130,175,220,0.45)';
-    ctx.fillText('L = ' + L + ' px', W - 24, y0);
-    ctx.fillText('g = ' + G.toFixed(1), W - 24, y0 + 22);
-    ctx.fillText('damp = ' + (1 - DAMP).toFixed(3), W - 24, y0 + 44);
+    ctx.fillStyle = 'rgba(160,140,210,0.4)';
+    const rx = W - 24;
+    ctx.fillText('L\u2081 = ' + L1 + '  L\u2082 = ' + L2, rx, y0);
+    ctx.fillText('m\u2081 = ' + m1.toFixed(1) + '  m\u2082 = ' + m2.toFixed(1), rx, y0 + 20);
+    ctx.fillText('g = ' + G.toFixed(1), rx, y0 + 40);
+    ctx.fillText('RK4 \u0394t = ' + (DT * 1000).toFixed(1) + ' ms', rx, y0 + 60);
     ctx.restore();
   }
 
@@ -289,28 +427,30 @@
     ctx.save();
     ctx.font = '600 15px system-ui,sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(160,185,220,0.45)';
-    ctx.fillText('\u5355 \u6446 \u6A21 \u62DF \u5668', W / 2, 32);
+    ctx.fillStyle = 'rgba(180,160,220,0.45)';
+    ctx.fillText('\u53CC \u6446 \u6DF7 \u6C8C \u6A21 \u62DF \u5668', W / 2, 32);
     ctx.font = '11px system-ui,sans-serif';
-    ctx.fillStyle = 'rgba(140,160,190,0.25)';
-    ctx.fillText('Simple Pendulum Simulator \u00B7 Week 05', W / 2, 50);
+    ctx.fillStyle = 'rgba(160,140,200,0.25)';
+    ctx.fillText('Double Pendulum Chaos \u00B7 RK4 Integration \u00B7 Week 05', W / 2, 50);
     ctx.restore();
   }
 
   /* ====== 绘制：操作提示（自动淡出） ====== */
   function drawHint() {
     let a = 0.4;
-    if (simTime > 3) a = Math.max(0, 0.4 - (simTime - 3) * 0.1);
+    if (simTime > 4) a = Math.max(0, 0.4 - (simTime - 4) * 0.08);
     if (a <= 0) return;
     ctx.save();
     ctx.font = '12px system-ui,sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(160,180,210,' + a.toFixed(3) + ')';
-    ctx.fillText('\u62D6\u62FD\u6446\u7403\u8BBE\u5B9A\u521D\u59CB\u89D2\u5EA6', W / 2, H - 140);
+    ctx.fillStyle = 'rgba(180,160,220,' + a.toFixed(3) + ')';
+    ctx.fillText('\u62D6\u62FD\u6446\u7403\u8BBE\u5B9A\u521D\u59CB\u89D2\u5EA6\uFF0C\u91CA\u653E\u540E\u89C2\u5BDF\u6DF7\u6C8C\u8FD0\u52A8', W / 2, H - 130);
     ctx.restore();
   }
 
   /* ====== 主渲染循环 ====== */
+  let hueCounter = 0;
+
   function frame(stamp) {
     if (lastStamp === null) lastStamp = stamp;
     let dt = (stamp - lastStamp) / 1000;
@@ -323,13 +463,15 @@
         step(DT);
         accum -= DT;
       }
-      const b = bobXY(theta);
-      trail.push({ x: b.x, y: b.y });
-      if (trail.length > TRAIL_MAX) trail.shift();
+      // 记录拖尾
+      const b2 = bob2XY();
+      hueCounter = (hueCounter + 1.2) % 360;
+      trail.push({ x: b2.x, y: b2.y, hue: hueCounter });
+      while (trail.length > trailMax) trail.shift();
     }
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#1a1a24';
+    ctx.fillStyle = '#0d0d18';
     ctx.fillRect(0, 0, W, H);
 
     drawGrid();
@@ -337,9 +479,9 @@
     drawRefLine();
     drawTrail();
     drawBracket();
-    drawRod();
+    drawRods();
     drawPivot();
-    drawBob();
+    drawBobs();
     drawHUD();
     drawHint();
 
@@ -352,9 +494,14 @@
   }
 
   canvas.addEventListener('mousedown', function (e) {
-    const m = mousePos(e), b = bobXY(theta);
-    if (Math.hypot(m.x - b.x, m.y - b.y) < 35) {
-      dragging = true;
+    const m = mousePos(e);
+    const b1 = bob1XY(), b2 = bob2XY();
+    // 优先拖拽更远的球2
+    if (Math.hypot(m.x - b2.x, m.y - b2.y) < 35) {
+      dragging = 2;
+      trail.length = 0;
+    } else if (Math.hypot(m.x - b1.x, m.y - b1.y) < 35) {
+      dragging = 1;
       trail.length = 0;
     }
   });
@@ -362,24 +509,48 @@
   canvas.addEventListener('mousemove', function (e) {
     if (!dragging) return;
     const m = mousePos(e), p = pivot();
-    theta = Math.atan2(m.x - p.x, m.y - p.y);
-    omega = 0;
+    if (dragging === 1) {
+      state[0] = Math.atan2(m.x - p.x, m.y - p.y);
+      state[1] = 0;
+      state[3] = 0;
+    } else if (dragging === 2) {
+      const b1 = bob1XY();
+      state[2] = Math.atan2(m.x - b1.x, m.y - b1.y);
+      state[1] = 0;
+      state[3] = 0;
+    }
   });
 
   canvas.addEventListener('mouseup', function () {
-    if (dragging) { dragging = false; simTime = 0; omega = 0; }
+    if (dragging) {
+      dragging = 0;
+      state[1] = 0;
+      state[3] = 0;
+      simTime = 0;
+      accum = 0;
+    }
   });
 
   canvas.addEventListener('mouseleave', function () {
-    if (dragging) { dragging = false; simTime = 0; omega = 0; }
+    if (dragging) {
+      dragging = 0;
+      state[1] = 0;
+      state[3] = 0;
+      simTime = 0;
+      accum = 0;
+    }
   });
 
   /* ====== 触摸交互 ====== */
   canvas.addEventListener('touchstart', function (e) {
     e.preventDefault();
-    const t = e.touches[0], b = bobXY(theta);
-    if (Math.hypot(t.clientX - b.x, t.clientY - b.y) < 45) {
-      dragging = true;
+    const t = e.touches[0];
+    const b1 = bob1XY(), b2 = bob2XY();
+    if (Math.hypot(t.clientX - b2.x, t.clientY - b2.y) < 45) {
+      dragging = 2;
+      trail.length = 0;
+    } else if (Math.hypot(t.clientX - b1.x, t.clientY - b1.y) < 45) {
+      dragging = 1;
       trail.length = 0;
     }
   }, { passive: false });
@@ -388,49 +559,70 @@
     e.preventDefault();
     if (!dragging) return;
     const t = e.touches[0], p = pivot();
-    theta = Math.atan2(t.clientX - p.x, t.clientY - p.y);
-    omega = 0;
+    if (dragging === 1) {
+      state[0] = Math.atan2(t.clientX - p.x, t.clientY - p.y);
+      state[1] = 0;
+      state[3] = 0;
+    } else if (dragging === 2) {
+      const b1 = bob1XY();
+      state[2] = Math.atan2(t.clientX - b1.x, t.clientY - b1.y);
+      state[1] = 0;
+      state[3] = 0;
+    }
   }, { passive: false });
 
   canvas.addEventListener('touchend', function () {
-    if (dragging) { dragging = false; simTime = 0; omega = 0; }
+    if (dragging) {
+      dragging = 0;
+      state[1] = 0;
+      state[3] = 0;
+      simTime = 0;
+      accum = 0;
+    }
   });
 
   /* ====== 控制面板交互 ====== */
-  const sldL = document.getElementById('sldL');
-  const sldG = document.getElementById('sldG');
-  const sldD = document.getElementById('sldD');
-  const valL = document.getElementById('valL');
-  const valG = document.getElementById('valG');
-  const valD = document.getElementById('valD');
+  const sldL1 = document.getElementById('sldL1');
+  const sldL2 = document.getElementById('sldL2');
+  const sldM2 = document.getElementById('sldM2');
+  const sldG  = document.getElementById('sldG');
+  const sldTrail = document.getElementById('sldTrail');
+  const valL1 = document.getElementById('valL1');
+  const valL2 = document.getElementById('valL2');
+  const valM2 = document.getElementById('valM2');
+  const valG  = document.getElementById('valG');
+  const valTrail = document.getElementById('valTrail');
 
-  sldL.addEventListener('input', function () {
-    L = +this.value;
-    valL.textContent = L + ' px';
-    trail.length = 0;
+  sldL1.addEventListener('input', function () {
+    L1 = +this.value; valL1.textContent = L1 + ' px'; trail.length = 0;
+  });
+  sldL2.addEventListener('input', function () {
+    L2 = +this.value; valL2.textContent = L2 + ' px'; trail.length = 0;
+  });
+  sldM2.addEventListener('input', function () {
+    m2 = +this.value; valM2.textContent = m2.toFixed(1);
   });
   sldG.addEventListener('input', function () {
-    G = +this.value;
-    valG.textContent = G.toFixed(1);
+    G = +this.value; valG.textContent = G.toFixed(1);
   });
-  sldD.addEventListener('input', function () {
-    var c = +this.value;
-    DAMP = 1 - c;
-    valD.textContent = c.toFixed(3);
+  sldTrail.addEventListener('input', function () {
+    trailMax = +this.value; valTrail.textContent = trailMax;
   });
 
-  /* ====== 重置函数 (命名函数，确保作用域可达) ====== */
+  /* ====== 重置 ====== */
   function resetAnimation() {
-    theta  = Math.PI / 4;
-    omega  = 0;
+    state = [Math.PI * 0.6, 0, Math.PI * 0.8, 0];
     simTime = 0;
-    accum  = 0;
+    accum = 0;
     lastStamp = null;
     trail.length = 0;
-    L = 200; G = 9.8; DAMP = 0.999;
-    sldL.value = 200;  valL.textContent = '200 px';
-    sldG.value = 9.8;  valG.textContent = '9.8';
-    sldD.value = 0.001; valD.textContent = '0.001';
+    hueCounter = 0;
+    L1 = 150; L2 = 150; m1 = 1.5; m2 = 1.5; G = 9.8; trailMax = 600;
+    sldL1.value = 150; valL1.textContent = '150 px';
+    sldL2.value = 150; valL2.textContent = '150 px';
+    sldM2.value = 1.5;  valM2.textContent = '1.5';
+    sldG.value = 9.8;   valG.textContent = '9.8';
+    sldTrail.value = 600; valTrail.textContent = '600';
   }
 
   document.getElementById('resetBtn').addEventListener('click', resetAnimation);
