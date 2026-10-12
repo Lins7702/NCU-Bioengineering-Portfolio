@@ -10,12 +10,40 @@
   canvas { display: block; cursor: grab; }
   canvas:active { cursor: grabbing; }
   #controls {
-    height: 108px; flex-shrink: 0;
+    height: 162px; flex-shrink: 0;
     background: linear-gradient(180deg, #141422, #0d0d18);
     border-top: 1px solid rgba(120,80,200,0.12);
-    display: flex; align-items: center; justify-content: center;
-    gap: 28px; padding: 10px 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 8px 24px;
     font-family: 'Cascadia Code','Consolas','Courier New',monospace;
+  }
+  .presets-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .presets-label {
+    font-size: 10px; color: rgba(160,140,210,0.4);
+    letter-spacing: 0.5px; user-select: none; margin-right: 4px;
+  }
+  .preset-btn {
+    padding: 5px 16px; border: 1px solid rgba(140,100,220,0.2);
+    border-radius: 20px; background: rgba(50,35,80,0.3);
+    color: rgba(180,160,220,0.7); font: 12px/1 system-ui,sans-serif;
+    cursor: pointer; transition: all 0.25s; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .preset-btn:hover {
+    background: rgba(60,45,110,0.5); border-color: rgba(140,100,220,0.4);
+    box-shadow: 0 0 10px rgba(140,100,220,0.15);
+  }
+  .preset-btn:active { transform: scale(0.95); }
+  .preset-btn.active {
+    background: rgba(100,70,180,0.4); border-color: rgba(160,120,240,0.5);
+    color: rgba(210,190,255,0.9); box-shadow: 0 0 12px rgba(140,100,220,0.25);
+  }
+  .preset-btn .icon { font-size: 14px; }
+  .sliders-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 28px; width: 100%;
   }
   .ctrl { display: flex; flex-direction: column; align-items: center; gap: 5px; }
   .ctrl label {
@@ -56,6 +84,14 @@
 <body>
 <canvas id="sim"></canvas>
 <div id="controls">
+  <div class="presets-row">
+    <span class="presets-label">场景</span>
+    <button class="preset-btn" data-g="9.8"><span class="icon">🌍</span>地球</button>
+    <button class="preset-btn" data-g="1.6"><span class="icon">🌙</span>月球</button>
+    <button class="preset-btn" data-g="24.8"><span class="icon">🟠</span>木星</button>
+    <button class="preset-btn" data-g="0.1"><span class="icon">🌌</span>太空</button>
+  </div>
+  <div class="sliders-row">
   <div class="ctrl">
     <label>摆长 L₁</label>
     <input type="range" id="sldL1" min="60" max="250" value="150" step="1">
@@ -82,6 +118,7 @@
     <span class="val" id="valTrail">600</span>
   </div>
   <button id="resetBtn">重置摆动</button>
+  </div>
 </div>
 <script>
 (() => {
@@ -91,7 +128,7 @@
   const canvas = document.getElementById('sim');
   const ctx = canvas.getContext('2d');
   let W, H, dpr;
-  const PANEL_H = 108;
+  const PANEL_H = 162;
 
   function resize() {
     dpr = window.devicePixelRatio || 1;
@@ -110,6 +147,9 @@
   let L1 = 150, L2 = 150;       // 两段摆长 (px)
   let m1 = 1.5, m2 = 1.5;       // 两个摆球质量
   let G  = 9.8;                   // 重力加速度
+  let currentG = G;               // 平滑过渡用当前重力值
+  let targetG = G;                // 目标重力值
+  const DEFAULT_G = 9.8;          // 默认重力
   const SCALE = 40;               // 像素/米 缩放因子
   const DT = 1 / 240;            // 固定物理步长 (s) — 高频率保证稳定性
   let trailMax = 600;             // 拖尾最大点数
@@ -417,7 +457,7 @@
     const rx = W - 24;
     ctx.fillText('L\u2081 = ' + L1 + '  L\u2082 = ' + L2, rx, y0);
     ctx.fillText('m\u2081 = ' + m1.toFixed(1) + '  m\u2082 = ' + m2.toFixed(1), rx, y0 + 20);
-    ctx.fillText('g = ' + G.toFixed(1), rx, y0 + 40);
+    ctx.fillText('g = ' + currentG.toFixed(1), rx, y0 + 40);
     ctx.fillText('RK4 \u0394t = ' + (DT * 1000).toFixed(1) + ' ms', rx, y0 + 60);
     ctx.restore();
   }
@@ -468,6 +508,12 @@
       hueCounter = (hueCounter + 1.2) % 360;
       trail.push({ x: b2.x, y: b2.y, hue: hueCounter });
       while (trail.length > trailMax) trail.shift();
+    }
+
+    // 重力平滑过渡
+    if (Math.abs(currentG - targetG) > 0.01) {
+      currentG = lerp(currentG, targetG, 0.06);
+      G = currentG;
     }
 
     ctx.clearRect(0, 0, W, H);
@@ -581,6 +627,65 @@
     }
   });
 
+  /* ====== 天体预设 ====== */
+  const PRESETS = {
+    '9.8':  { name: '地球', icon: '🌍' },
+    '1.6':  { name: '月球', icon: '🌙' },
+    '24.8': { name: '木星', icon: '' },
+    '0.1':  { name: '太空', icon: '🌌' }
+  };
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  /* ====== localStorage 持久化 ====== */
+  const STORAGE_KEY = 'pendulum_params_v1';
+
+  function saveParams() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        L1: L1, L2: L2, m2: m2, G: G, trailMax: trailMax
+      }));
+    } catch (e) { /* 静默失败 */ }
+  }
+
+  function loadParams() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const p = JSON.parse(raw);
+      if (p.L1 != null) { L1 = p.L1; sldL1.value = L1; valL1.textContent = L1 + ' px'; }
+      if (p.L2 != null) { L2 = p.L2; sldL2.value = L2; valL2.textContent = L2 + ' px'; }
+      if (p.m2 != null) { m2 = p.m2; sldM2.value = m2; valM2.textContent = m2.toFixed(1); }
+      if (p.G  != null) {
+        G = Math.max(1, Math.min(25, p.G));
+        G = Math.round(G * 10) / 10;
+        currentG = G; targetG = G;
+        sldG.value = G; valG.textContent = G.toFixed(1);
+      }
+      if (p.trailMax != null) { trailMax = p.trailMax; sldTrail.value = trailMax; valTrail.textContent = trailMax; }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function setActivePreset(gVal) {
+    const key = gVal.toFixed(1);
+    document.querySelectorAll('.preset-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.g === key);
+    });
+  }
+
+  function applyGravity(gVal) {
+    targetG = gVal;
+    sldG.value = gVal;
+    valG.textContent = gVal.toFixed(1);
+    setActivePreset(gVal);
+    saveParams();
+  }
+
+  /* 启动时尝试恢复缓存 */
+  var restored = loadParams();
+  if (restored) { setActivePreset(G); }
+
   /* ====== 控制面板交互 ====== */
   const sldL1 = document.getElementById('sldL1');
   const sldL2 = document.getElementById('sldL2');
@@ -594,19 +699,27 @@
   const valTrail = document.getElementById('valTrail');
 
   sldL1.addEventListener('input', function () {
-    L1 = +this.value; valL1.textContent = L1 + ' px'; trail.length = 0;
+    L1 = +this.value; valL1.textContent = L1 + ' px'; trail.length = 0; saveParams();
   });
   sldL2.addEventListener('input', function () {
-    L2 = +this.value; valL2.textContent = L2 + ' px'; trail.length = 0;
+    L2 = +this.value; valL2.textContent = L2 + ' px'; trail.length = 0; saveParams();
   });
   sldM2.addEventListener('input', function () {
-    m2 = +this.value; valM2.textContent = m2.toFixed(1);
+    m2 = +this.value; valM2.textContent = m2.toFixed(1); saveParams();
   });
   sldG.addEventListener('input', function () {
-    G = +this.value; valG.textContent = G.toFixed(1);
+    G = +this.value; currentG = G; targetG = G; valG.textContent = G.toFixed(1);
+    setActivePreset(G); saveParams();
   });
   sldTrail.addEventListener('input', function () {
-    trailMax = +this.value; valTrail.textContent = trailMax;
+    trailMax = +this.value; valTrail.textContent = trailMax; saveParams();
+  });
+
+  /* 预设按钮 */
+  document.querySelectorAll('.preset-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      applyGravity(+this.dataset.g);
+    });
   });
 
   /* ====== 重置 ====== */
@@ -617,12 +730,16 @@
     lastStamp = null;
     trail.length = 0;
     hueCounter = 0;
-    L1 = 150; L2 = 150; m1 = 1.5; m2 = 1.5; G = 9.8; trailMax = 600;
+    L1 = 150; L2 = 150; m1 = 1.5; m2 = 1.5;
+    G = DEFAULT_G; currentG = DEFAULT_G; targetG = DEFAULT_G;
+    trailMax = 600;
     sldL1.value = 150; valL1.textContent = '150 px';
     sldL2.value = 150; valL2.textContent = '150 px';
     sldM2.value = 1.5;  valM2.textContent = '1.5';
-    sldG.value = 9.8;   valG.textContent = '9.8';
+    sldG.value = DEFAULT_G;   valG.textContent = DEFAULT_G.toFixed(1);
     sldTrail.value = 600; valTrail.textContent = '600';
+    setActivePreset(DEFAULT_G);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
   }
 
   document.getElementById('resetBtn').addEventListener('click', resetAnimation);
