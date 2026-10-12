@@ -109,7 +109,7 @@
   </div>
   <div class="ctrl">
     <label>重力 g</label>
-    <input type="range" id="sldG" min="1" max="25" value="9.8" step="0.1">
+    <input type="range" id="sldG" min="0.1" max="25" value="9.8" step="0.1">
     <span class="val" id="valG">9.8</span>
   </div>
   <div class="ctrl">
@@ -627,6 +627,18 @@
     }
   });
 
+  /* ====== DOM 元素引用（必须在 loadParams 之前） ====== */
+  const sldL1 = document.getElementById('sldL1');
+  const sldL2 = document.getElementById('sldL2');
+  const sldM2 = document.getElementById('sldM2');
+  const sldG  = document.getElementById('sldG');
+  const sldTrail = document.getElementById('sldTrail');
+  const valL1 = document.getElementById('valL1');
+  const valL2 = document.getElementById('valL2');
+  const valM2 = document.getElementById('valM2');
+  const valG  = document.getElementById('valG');
+  const valTrail = document.getElementById('valTrail');
+
   /* ====== 天体预设 ====== */
   const PRESETS = {
     '9.8':  { name: '地球', icon: '🌍' },
@@ -643,21 +655,21 @@
   function saveParams() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        L1: L1, L2: L2, m2: m2, G: G, trailMax: trailMax
+        L1: L1, L2: L2, m2: m2, G: targetG, trailMax: trailMax
       }));
     } catch (e) { /* 静默失败 */ }
   }
 
   function loadParams() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return false;
-      const p = JSON.parse(raw);
+      var p = JSON.parse(raw);
       if (p.L1 != null) { L1 = p.L1; sldL1.value = L1; valL1.textContent = L1 + ' px'; }
       if (p.L2 != null) { L2 = p.L2; sldL2.value = L2; valL2.textContent = L2 + ' px'; }
       if (p.m2 != null) { m2 = p.m2; sldM2.value = m2; valM2.textContent = m2.toFixed(1); }
       if (p.G  != null) {
-        G = Math.max(1, Math.min(25, p.G));
+        G = Math.max(0.1, Math.min(25, p.G));
         G = Math.round(G * 10) / 10;
         currentG = G; targetG = G;
         sldG.value = G; valG.textContent = G.toFixed(1);
@@ -676,6 +688,7 @@
 
   function applyGravity(gVal) {
     targetG = gVal;
+    G = gVal;
     sldG.value = gVal;
     valG.textContent = gVal.toFixed(1);
     setActivePreset(gVal);
@@ -687,17 +700,6 @@
   if (restored) { setActivePreset(G); }
 
   /* ====== 控制面板交互 ====== */
-  const sldL1 = document.getElementById('sldL1');
-  const sldL2 = document.getElementById('sldL2');
-  const sldM2 = document.getElementById('sldM2');
-  const sldG  = document.getElementById('sldG');
-  const sldTrail = document.getElementById('sldTrail');
-  const valL1 = document.getElementById('valL1');
-  const valL2 = document.getElementById('valL2');
-  const valM2 = document.getElementById('valM2');
-  const valG  = document.getElementById('valG');
-  const valTrail = document.getElementById('valTrail');
-
   sldL1.addEventListener('input', function () {
     L1 = +this.value; valL1.textContent = L1 + ' px'; trail.length = 0; saveParams();
   });
