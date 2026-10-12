@@ -6,13 +6,73 @@
 <title>单摆模拟器 · Week 05</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a24; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a24; display: flex; flex-direction: column; }
   canvas { display: block; cursor: grab; }
   canvas:active { cursor: grabbing; }
+  #controls {
+    height: 108px; flex-shrink: 0;
+    background: linear-gradient(180deg, #1e1e2a, #1a1a24);
+    border-top: 1px solid rgba(80,130,200,0.12);
+    display: flex; align-items: center; justify-content: center;
+    gap: 32px; padding: 10px 24px;
+    font-family: 'Cascadia Code','Consolas','Courier New',monospace;
+  }
+  .ctrl { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .ctrl label {
+    font-size: 11px; color: rgba(140,170,210,0.6);
+    letter-spacing: 0.5px; user-select: none; white-space: nowrap;
+  }
+  .ctrl input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 150px; height: 4px;
+    background: rgba(60,80,120,0.35); border-radius: 2px; outline: none;
+  }
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: #4a9ae0; cursor: pointer;
+    box-shadow: 0 0 8px rgba(74,154,224,0.5);
+  }
+  .ctrl input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border: none;
+    border-radius: 50%; background: #4a9ae0; cursor: pointer;
+    box-shadow: 0 0 8px rgba(74,154,224,0.5);
+  }
+  .ctrl .val {
+    font-size: 12px; color: rgba(100,190,255,0.8); min-width: 50px; text-align: center;
+  }
+  #resetBtn {
+    padding: 8px 22px; border: 1px solid rgba(80,150,220,0.25);
+    border-radius: 6px; background: rgba(40,50,80,0.45);
+    color: rgba(160,195,235,0.8); font: 13px/1 system-ui,sans-serif;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
+  }
+  #resetBtn:hover {
+    background: rgba(50,70,110,0.6); border-color: rgba(80,150,220,0.45);
+    box-shadow: 0 0 14px rgba(80,150,220,0.18);
+  }
+  #resetBtn:active { transform: scale(0.96); }
 </style>
 </head>
 <body>
 <canvas id="sim"></canvas>
+<div id="controls">
+  <div class="ctrl">
+    <label>摆长 L</label>
+    <input type="range" id="sldL" min="100" max="350" value="200" step="1">
+    <span class="val" id="valL">200 px</span>
+  </div>
+  <div class="ctrl">
+    <label>重力 g</label>
+    <input type="range" id="sldG" min="1" max="25" value="9.8" step="0.1">
+    <span class="val" id="valG">9.8</span>
+  </div>
+  <div class="ctrl">
+    <label>阻尼</label>
+    <input type="range" id="sldD" min="0" max="0.010" value="0.001" step="0.001">
+    <span class="val" id="valD">0.001</span>
+  </div>
+  <button id="resetBtn">重置摆动</button>
+</div>
 <script>
 (() => {
   'use strict';
@@ -21,11 +81,12 @@
   const canvas = document.getElementById('sim');
   const ctx = canvas.getContext('2d');
   let W, H, dpr;
+  const PANEL_H = 108;    // 控制面板高度 (px)
 
   function resize() {
     dpr = window.devicePixelRatio || 1;
     W = window.innerWidth;
-    H = window.innerHeight;
+    H = window.innerHeight - PANEL_H;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     canvas.style.width = W + 'px';
@@ -36,10 +97,10 @@
   window.addEventListener('resize', resize);
 
   /* ====== 物理参数 ====== */
-  const L     = 200;          // 摆长 (px)
-  const G     = 9.8;          // 重力加速度
+  let L     = 200;          // 摆长 (px)
+  let G     = 9.8;          // 重力加速度
   const SCALE = 50;           // 像素/米 缩放因子
-  const DAMP  = 0.999;        // 微弱阻尼
+  let DAMP  = 0.999;        // 阻尼系数 (由滑块控制)
   const DT    = 1 / 120;      // 固定物理步长 (s)
 
   /* ====== 状态变量 ====== */
@@ -215,6 +276,11 @@
     ctx.fillText('\u2220  \u03B8 = ' + deg + '\u00B0', x, y0);
     ctx.fillText('\u03C9 = ' + vel + ' rad/s', x, y0 + 22);
     ctx.fillText('t = ' + sec + ' s', x, y0 + 44);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(130,175,220,0.45)';
+    ctx.fillText('L = ' + L + ' px', W - 24, y0);
+    ctx.fillText('g = ' + G.toFixed(1), W - 24, y0 + 22);
+    ctx.fillText('damp = ' + (1 - DAMP).toFixed(3), W - 24, y0 + 44);
     ctx.restore();
   }
 
@@ -240,7 +306,7 @@
     ctx.font = '12px system-ui,sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(160,180,210,' + a.toFixed(3) + ')';
-    ctx.fillText('\u62D6\u62FD\u6446\u7403\u8BBE\u5B9A\u521D\u59CB\u89D2\u5EA6', W / 2, H - 24);
+    ctx.fillText('\u62D6\u62FD\u6446\u7403\u8BBE\u5B9A\u521D\u59CB\u89D2\u5EA6', W / 2, H - 140);
     ctx.restore();
   }
 
@@ -328,6 +394,42 @@
 
   canvas.addEventListener('touchend', function () {
     if (dragging) { dragging = false; simTime = 0; omega = 0; }
+  });
+
+  /* ====== 控制面板交互 ====== */
+  const sldL = document.getElementById('sldL');
+  const sldG = document.getElementById('sldG');
+  const sldD = document.getElementById('sldD');
+  const valL = document.getElementById('valL');
+  const valG = document.getElementById('valG');
+  const valD = document.getElementById('valD');
+
+  sldL.addEventListener('input', function () {
+    L = +this.value;
+    valL.textContent = L + ' px';
+    trail.length = 0;
+  });
+  sldG.addEventListener('input', function () {
+    G = +this.value;
+    valG.textContent = G.toFixed(1);
+  });
+  sldD.addEventListener('input', function () {
+    var c = +this.value;
+    DAMP = 1 - c;
+    valD.textContent = c.toFixed(3);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    theta = Math.PI / 4;
+    omega = 0;
+    simTime = 0;
+    accum = 0;
+    lastStamp = null;
+    trail.length = 0;
+    L = 200; G = 9.8; DAMP = 0.999;
+    sldL.value = 200; valL.textContent = '200 px';
+    sldG.value = 9.8;  valG.textContent = '9.8';
+    sldD.value = 0.001; valD.textContent = '0.001';
   });
 
   /* ====== 启动 ====== */
