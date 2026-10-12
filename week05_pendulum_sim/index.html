@@ -697,7 +697,7 @@
 
   /* 启动时尝试恢复缓存 */
   var restored = loadParams();
-  if (restored) { setActivePreset(G); }
+  setActivePreset(restored ? G : DEFAULT_G);
 
   /* ====== 控制面板交互 ====== */
   sldL1.addEventListener('input', function () {
