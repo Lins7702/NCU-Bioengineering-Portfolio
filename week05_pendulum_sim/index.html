@@ -419,18 +419,21 @@
     valD.textContent = c.toFixed(3);
   });
 
-  document.getElementById('resetBtn').addEventListener('click', function () {
-    theta = Math.PI / 4;
-    omega = 0;
+  /* ====== 重置函数 (命名函数，确保作用域可达) ====== */
+  function resetAnimation() {
+    theta  = Math.PI / 4;
+    omega  = 0;
     simTime = 0;
-    accum = 0;
+    accum  = 0;
     lastStamp = null;
     trail.length = 0;
     L = 200; G = 9.8; DAMP = 0.999;
-    sldL.value = 200; valL.textContent = '200 px';
+    sldL.value = 200;  valL.textContent = '200 px';
     sldG.value = 9.8;  valG.textContent = '9.8';
     sldD.value = 0.001; valD.textContent = '0.001';
-  });
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', resetAnimation);
 
   /* ====== 启动 ====== */
   requestAnimationFrame(frame);
